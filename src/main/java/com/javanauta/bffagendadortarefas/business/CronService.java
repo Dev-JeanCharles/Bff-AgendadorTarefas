@@ -28,19 +28,24 @@ public class CronService {
 
     @Scheduled(cron = "${cron.horario}")
     public void buscaTarefasProximaHora() {
-        String token = login(converterParaRequestDTO());
-        log.info("[CRON-SERVICE] Iniciando processo de busca de tarefas - scheduler ativo");
-        LocalDateTime horaAtual = LocalDateTime.now();
-        LocalDateTime horaFutura = LocalDateTime.now().plusHours(1);
 
-        List<TarefasResponse> listaTarefas = tarefasService.buscarTarefasAgendadasPorPeriodo(horaAtual, horaFutura, token);
+        try {
+            String token = login(converterParaRequestDTO());
+            log.info("[CRON-SERVICE] Iniciando processo de busca de tarefas - scheduler ativo");
+            LocalDateTime horaAtual = LocalDateTime.now();
+            LocalDateTime horaFutura = LocalDateTime.now().plusHours(1);
 
-        log.info("[CRON-SERVICE] Tarefas encontradas: {}", listaTarefas);
-        listaTarefas.forEach(tarefa -> {emailService.enviaEmail(tarefa);
-            log.info("[CRON-SERVICE] Email enviado para o usuário: {}", tarefa.getEmail());
-            tarefasService.alteraStatus(StatusNotificacao.NOTIFICADO, tarefa.getId(), token);});
+            List<TarefasResponse> listaTarefas = tarefasService.buscarTarefasAgendadasPorPeriodo(horaAtual, horaFutura, token);
 
-        log.info("[CRON-SERVICE] Finalizada a busca e notificação de tarefas");
+            log.info("[CRON-SERVICE] Tarefas encontradas: {}", listaTarefas);
+            listaTarefas.forEach(tarefa -> {emailService.enviaEmail(tarefa);
+                log.info("[CRON-SERVICE] Email enviado para o usuário: {}", tarefa.getEmail());
+                tarefasService.alteraStatus(StatusNotificacao.NOTIFICADO, tarefa.getId(), token);});
+
+            log.info("[CRON-SERVICE] Finalizada a busca e notificação de tarefas");
+        }catch (Exception e){
+            log.error("[CRON-SERVICE] Erro ao executar scheduler", e);
+        }
     }
 
     public String login(LoginRequest request) {
