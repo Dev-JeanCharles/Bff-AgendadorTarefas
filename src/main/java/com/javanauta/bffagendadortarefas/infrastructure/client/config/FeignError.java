@@ -7,30 +7,47 @@ import feign.codec.ErrorDecoder;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.function.Function;
 
 public class FeignError implements ErrorDecoder {
+
+    private static final String ERROR_PREFIX = "Erro: ";
+
+    private static final Map<Integer, Function<String, Exception>> EXCEPTION_MAP = Map.of(
+            400, IllegalArgumentException::new,
+            401, UnauthorizedException::new,
+            403, ResourceNotFoundException::new,
+            409, ConflictException::new
+    );
 
     @Override
     public Exception decode(String methodKey, Response response) {
 
-        String mensagem = mensagemErro(response);
+        String mensagem = buildMessage(response);
 
-        return switch (response.status()) {
-            case 400 -> new IllegalArgumentException("Erro: " + mensagem);
-            case 401 -> new UnauthorizedException("Erro: " + mensagem);
-            case 403 -> new ResourceNotFoundException("Erro: " + mensagem);
-            case 409 -> new ConflictException("Erro: " + mensagem);
-            default -> new BusinessException("Erro externo: " + mensagem);
-        };
+        return EXCEPTION_MAP
+                .getOrDefault(response.status(), this::defaultException)
+                .apply(mensagem);
     }
 
-    private String mensagemErro(Response response) {
-        try {
-            return response.body() != null
-                    ? new String(response.body().asInputStream().readAllBytes(), StandardCharsets.UTF_8)
-                    : "";
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    private String buildMessage(Response response) {
+        return ERROR_PREFIX + extractBody(response);
+    }
+
+    private String extractBody(Response response) {
+        if (response.body() == null) {
+            return "";
         }
+
+        try {
+            return new String(response.body().asInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "Erro ao ler resposta do serviço externo";
+        }
+    }
+
+    private Exception defaultException(String message) {
+        return new BusinessException("Erro externo: " + message);
     }
 }
